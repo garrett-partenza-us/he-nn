@@ -86,9 +86,36 @@ def matmul(a, b):
 
     return arr
 
-
+"""
 a = np.arange(8*32).reshape(32,8)
 b = np.arange(8*32).reshape(8,32)
 print(np.matmul(a, b))
 print(matmul(a, b))
+"""
 
+def sigma_transformation_matrix(m, l):
+
+    transformation_matrix = np.zeros((m*l, m*l))
+
+    for h in range(m*l):
+        for i in range(m):
+            for j in range(l):
+
+                if h == i + ((i+j) % l) * m:
+                    transformation_matrix[i+j*m, h] = 1
+
+    return transformation_matrix
+
+
+def theta_transformation_matrix(l, n):
+
+    transformation_matrix = np.zeros((l*n, l*n))
+
+    for h in range(l*n):
+        for i in range(l):
+            for j in range(n):
+
+                if h == ((i+j) % l) + j * l:
+                    transformation_matrix[i+j*l, h] = 1
+
+    return transformation_matrix
