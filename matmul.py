@@ -1,3 +1,4 @@
+import math
 from itertools import cycle, islice
 import numpy as np
 
@@ -86,12 +87,6 @@ def matmul(a, b):
 
     return arr
 
-"""
-a = np.arange(8*32).reshape(32,8)
-b = np.arange(8*32).reshape(8,32)
-print(np.matmul(a, b))
-print(matmul(a, b))
-"""
 
 def sigma_transformation_matrix(m, l):
 
@@ -117,5 +112,30 @@ def theta_transformation_matrix(l, n):
 
                 if h == ((i+j) % l) + j * l:
                     transformation_matrix[i+j*l, h] = 1
+
+    return transformation_matrix
+
+def epsilon_transformation_matrix(m, n, l, offset = 0):
+
+    transformation_matrix = np.zeros((m*n, m*l))
+
+    for i in range(m*n):
+        for j in range(m*l):
+
+            if j == (offset * m + i) % (m*l):
+                transformation_matrix[i, j] = 1
+
+    return transformation_matrix
+
+
+def omega_transformation_matrix(m, n, l, offset = 0):
+
+    transformation_matrix = np.zeros((m*n, n*l))
+
+    for i in range(m*n):
+        for j in range(n*l):
+
+            if j == ((offset + (i % m)) % l) + math.floor(i/m) * l:
+                transformation_matrix[i, j] = 1
 
     return transformation_matrix
