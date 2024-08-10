@@ -139,3 +139,47 @@ def omega_transformation_matrix(m, n, l, offset = 0):
                 transformation_matrix[i, j] = 1
 
     return transformation_matrix
+
+def matmul_transformation(a, b):
+
+    assert(a.ndim == 2, "matmul error: number of dimensions must be 2")
+    assert(b.ndim == 2, "matmul error: number of dimensions must be 2")
+    assert(a.shape[1] == b.shape[0], "matmul error: dimensions incompatable")
+    
+    m, l, n = a.shape[0], a.shape[1], b.shape[1]
+    
+    A = np.matmul(
+        sigma_transformation_matrix(m, l),
+        a.copy().flatten(order='F')
+    )
+    
+    B = np.matmul(
+        theta_transformation_matrix(l, n),
+        b.copy().flatten(order='F')
+    )
+
+    C = np.zeros((a.shape[0] * b.shape[1]))
+
+    for k in range(a.shape[1]):
+
+
+        lhs = np.matmul(
+            epsilon_transformation_matrix(m, n, l, k),
+            A.copy()
+        )
+
+        rhs = np.matmul(
+            omega_transformation_matrix(m, n, l, k),
+            B.copy()
+        )
+
+        C += np.multiply(lhs, rhs)
+
+    C = C.reshape((m,n), order='F')
+
+    return C
+
+a = np.random.randint(1,10,(4,6))
+b = np.random.randint(1,10,(6,4))
+print(np.matmul(a.copy(), b.copy()))
+print(matmul_transformation(a.copy(), b.copy()))
