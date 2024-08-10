@@ -1,6 +1,8 @@
 import math
+import random
 from itertools import cycle, islice
 import numpy as np
+from tqdm import tqdm
 
 
 def shift(row, offset):
@@ -10,8 +12,6 @@ def shift(row, offset):
 
 
 def sigma(arr):
-
-    assert(arr.ndim == 2, "shiftrows error: dimensions must be 2")
 
     rows, _ = arr.shape
     
@@ -24,8 +24,6 @@ def sigma(arr):
 
 def theta(arr):
 
-    assert(arr.ndim == 2, "shiftcols error: dimensions must be 2")
-
     _, cols = arr.shape
     
     for idx in range(cols):
@@ -36,8 +34,6 @@ def theta(arr):
 
 
 def epsilon(arr, size, offset=0):
-
-    assert(arr.ndim == 2, "repeatrows error: dimensions must be 2")
 
     rows, _ = arr.shape
 
@@ -54,8 +50,6 @@ def epsilon(arr, size, offset=0):
 
 def omega(arr, size, offset=0):
 
-    assert(arr.ndim == 2, "repeatcols error: dimensions must be 2")
-
     _, cols = arr.shape
 
     result = np.empty((size, cols))
@@ -71,8 +65,9 @@ def omega(arr, size, offset=0):
 
 def matmul(a, b):
 
-    assert(a.ndim == 2, "matmul error: dimensions must be 2")
-    assert(b.ndim == 2, "matmul error: dimensions must be 2")
+    assert a.ndim == 2, "matmul error: dimensions must be 2"
+    assert b.ndim == 2, "matmul error: dimensions must be 2"
+    assert a.shape[1] == b.shape[0], "matmul error: dimensions incompatable"
 
     m, l = a.shape
     l, n = b.shape
@@ -142,9 +137,9 @@ def omega_transformation_matrix(m, n, l, offset = 0):
 
 def matmul_transformation(a, b):
 
-    assert(a.ndim == 2, "matmul error: number of dimensions must be 2")
-    assert(b.ndim == 2, "matmul error: number of dimensions must be 2")
-    assert(a.shape[1] == b.shape[0], "matmul error: dimensions incompatable")
+    assert a.ndim == 2, "matmul error: number of dimensions must be 2"
+    assert b.ndim == 2, "matmul error: number of dimensions must be 2"
+    assert a.shape[1] == b.shape[0], "matmul error: dimensions incompatable"
     
     m, l, n = a.shape[0], a.shape[1], b.shape[1]
     
@@ -179,7 +174,24 @@ def matmul_transformation(a, b):
 
     return C
 
-a = np.random.randint(1,10,(4,6))
-b = np.random.randint(1,10,(6,4))
-print(np.matmul(a.copy(), b.copy()))
-print(matmul_transformation(a.copy(), b.copy()))
+
+if __name__ == '__main__':
+
+    print("Running test cases...")
+
+    for i in tqdm(range(100)):
+        m = random.randint(2,20)
+        l = random.randint(2,20)
+        n = random.randint(2,20)
+
+        a = np.random.rand(m, l)
+        b = np.random.rand(l, n)
+
+        numpy_matmul = np.matmul(a.copy(), b.copy())
+        hegmm_matmul = matmul_transformation(a.copy(), b.copy())
+
+        assert(np.allclose(numpy_matmul, hegmm_matmul))
+
+    print("PASSED")
+
+
