@@ -1,103 +1,92 @@
-import math
-import random
-from itertools import cycle, islice
+from seal import *
+from seal_helpers import *
 import numpy as np
-from tqdm import tqdm
+import math
+
+parms = EncryptionParameters(scheme_type.ckks)
+poly_modulus_degree = 16384
+parms.set_poly_modulus_degree(poly_modulus_degree)
+parms.set_coeff_modulus(CoeffModulus.Create(poly_modulus_degree, [60, 40, 40, 40, 40, 60]))
+scale = 2.0**40
+context = SEALContext(parms)
+print_parameters(context)
+
+ckks_encoder = CKKSEncoder(context)
+slot_count = ckks_encoder.slot_count()
+print(f'Number of slots: {slot_count}')
+
+keygen = KeyGenerator(context)
+public_key = keygen.create_public_key()
+secret_key = keygen.secret_key()
+galois_keys = keygen.create_galois_keys()
+relin_keys = keygen.create_relin_keys()
+
+encryptor = Encryptor(context, public_key)
+evaluator = Evaluator(context)
+decryptor = Decryptor(context, secret_key)
+
+def get_general_diagonals(matrix):
+
+    tiles = np.tile(matrix, 2)
+    return list(np.diag(tiles, idx) for idx in range(matrix.shape[1]))
 
 
-def shift(row, offset):
+def encrypt_vector(vector):
+ 
+    return encryptor.encrypt(ckks_encoder.encode(vector, scale))
 
-    offset = offset % len(row)
-    return np.concatenate((row[offset:], row[:offset]))
+def decrypt_vector(vector):
+    
+    return ckks_encoder.decode(decryptor.decrypt(vector))
 
-
-def sigma(arr):
-
-    rows, _ = arr.shape
-
-    for idx in range(rows):
-
-        arr[idx] = shift(arr[idx], idx)
-
-    return arr
+def rotate_vector(vector, steps):
+    
+    return evaluator.rotate_vector(vector, -steps, galois_keys)
 
 
-def theta(arr):
+def matrix_vector_multiplication(matrix, vector):
 
-    _, cols = arr.shape
+    diagonals = get_general_diagonals(matrix)
 
-    for idx in range(cols):
+    encrypted_diagonals = [encrypt_vector(diagonal) for diagonal in diagonals]
 
-        arr[:,idx] = shift(arr[:,idx], idx)
+    init = evaluator.multiply(encrypted_diagonals[0], vector)
 
-    return arr
+    init = evaluator.relinearize(init, relin_keys)
 
+    init = evaluator.rescale_to_next(init)
 
-def epsilon(arr, size, offset=0):
+    addends = [init]
 
-    rows, _ = arr.shape
+    for idx, diagonal in enumerate(encrypted_diagonals[1:]):
 
-    result = np.empty((rows, size))
+        addend = evaluator.multiply(
+            diagonal,
+            rotate_vector(vector, - (idx + 1))
+        )
 
-    for idx in range(rows):
+        addend = evaluator.relinearize(addend, relin_keys)
 
-        result[idx] = np.array(list(
-            islice(cycle(shift(arr[idx], offset)), size)
-        ))
+        addend = evaluator.rescale_to_next(addend)
 
-    return result
+        addends.append(addend)
 
+    sum = evaluator.add_many(addends)
 
-def omega(arr, size, offset=0):
-
-    _, cols = arr.shape
-
-    result = np.empty((size, cols))
-
-    for idx in range(cols):
-
-        result[:, idx] = np.array(list(
-            islice(cycle(shift(arr[:, idx], offset)), size)
-        ))
-
-    return result
-
-
-def hegmm(a, b):
-
-    assert a.ndim == 2, "matmul error: a-matrix dimensions must be 2"
-    assert b.ndim == 2, "matmul error: b-matrix dimensions must be 2"
-    assert a.shape[1] == b.shape[0], "matmul error: dimensions incompatable"
-
-    m, l = a.shape
-    l, n = b.shape
-
-    arr = np.zeros((m, n))
-
-    for k in range(l):
-        lhs = epsilon(sigma(a.copy()), n, offset=k)
-        rhs = omega(theta(b.copy()), m, offset=k)
-        addend = np.multiply(lhs, rhs)
-        arr+=addend
-
-    return arr
+    return sum
 
 
 if __name__ == '__main__':
 
-    print("Running test cases...")
+    A = np.random.randint(1,20,(8,8))
+    B = [1,2,3,4,5,6,7,8]
 
-    for i in tqdm(range(100)):
-        m = random.randint(2,20)
-        l = random.randint(2,20)
-        n = random.randint(2,20)
+    print(np.matmul(A, B))
 
-        a = np.random.rand(m, l)
-        b = np.random.rand(l, n)
+    B_encrypt = encrypt_vector(np.tile(B, 2))
 
-        numpy_matmul = np.matmul(a.copy(), b.copy())
-        hegmm_matmul = hegmm(a.copy(), b.copy())
+    C_encrypt = matrix_vector_multiplication(A, B_encrypt)
+    C_plain = decryptor.decrypt(C_encrypt)
+    C = ckks_encoder.decode(C_plain)
 
-        assert(np.allclose(numpy_matmul, hegmm_matmul))
-
-    print("PASSED")
+    print(np.array(C[:8]).astype(int))
