@@ -8,7 +8,8 @@ Despite the enormous technical and financial advantages of cloud computing, secu
 
 ## Installation 
 
-To set up the environment for running the code, follow these steps: 
+Prior to installation, please ensure you have installed the Python SEAL bindings
+from the Python SEAL repository. To set up the environment for running the code, follow these steps: 
 
 1. **Clone the repository:** 
 ```
