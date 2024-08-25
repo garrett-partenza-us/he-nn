@@ -5,6 +5,7 @@ import math
 from linear_ops import *
 import copy
 
+
 parms = EncryptionParameters(scheme_type.ckks)
 poly_modulus_degree = 16384
 parms.set_poly_modulus_degree(poly_modulus_degree)
@@ -45,6 +46,16 @@ def rotate_vector(vector, steps):
     
     return evaluator.rotate_vector(vector, -steps, galois_keys)
 
+def tile_encrypt(vector, len):
+    
+    vector_rot = Ciphertext(vector)
+    vector_rot = evaluator.rotate_vector(vector_rot, -len, galois_keys)
+    return evaluator.add(vector, vector_rot)
+
+def shift_transformation_matrix(n_rows, shifts, right=False):
+    if right:
+        shifts = -1 * shifts
+    return np.roll(np.eye(n), shifts, axis=1)
 
 def matrix_vector_multiplication(matrix, vector):
 
@@ -86,6 +97,8 @@ def matrix_multiplication(a_plain, b_encrypt, m, l, n):
 
     addends = []
 
+    b_encrypt = tile_encrypt(b_encrypt, l*n)
+
     A = np.matmul(
         sigma_transformation_matrix(m, l).astype(int),
         a_plain.copy().flatten(order='F')
@@ -98,13 +111,7 @@ def matrix_multiplication(a_plain, b_encrypt, m, l, n):
 
     B = evaluator.relinearize(B, relin_keys)
 
-    # TODO: Figure out how to do matrix vector multiplication without tiling
-    # This decryption makes the output correct, because the B matrix has to 
-    # be tiled for the rhs operation in the forloop.
-    B = decrypt_vector(B)
-    B = np.array(B[:16])
-    B = np.rint(B).astype(int)
-    B = encrypt_vector(np.tile(B,2))
+    B = tile_encrypt(B, l*n)
 
     for k in range(l):
         
@@ -130,8 +137,6 @@ def matrix_multiplication(a_plain, b_encrypt, m, l, n):
     return C
 
 
-
-
 if __name__ == '__main__':
 
     m, l, n = 4, 4, 4
@@ -144,7 +149,6 @@ if __name__ == '__main__':
     print("Plain...\n{}\n".format(np.matmul(A,B)))
 
     B = B.flatten(order='F')
-    B = np.tile(B, 2)
     B = encrypt_vector(B)
 
     C = matrix_multiplication(A, B, m, l, n)
@@ -154,38 +158,3 @@ if __name__ == '__main__':
     C = C.reshape(m, n, order='F')
     C = np.rint(C)
     print("Cryptic...\n{}\n".format(C))
-
-    # Example of matrix-vector multiplication
-    """
-    A = np.random.randint(1,20,(8,8))
-    B = np.array([1,2,3,4,5,6,7,8])
-
-    print("Plain: ", np.matmul(A, B))
-
-    B_encrypt = encrypt_vector(np.tile(B, 2))
-
-    C_encrypt = matrix_vector_multiplication(A, B_encrypt)
-    C_plain = decryptor.decrypt(C_encrypt)
-    C = ckks_encoder.decode(C_plain)
-
-    print("Cryptic: ", np.array(C[:8]).astype(int))
-    """
-    
-
-    """
-    # Example of matrix-vector multiplication where B is encrypted
-
-    A = np.arange(1,17).reshape(4,4)
-    T = sigma_transformation_matrix(4, 4).astype(int)
-    print("Transformation Matrix: ", T)
-    A = A.flatten(order='F')
-    A = np.tile(A, 2)
-    A = encrypt_vector(A)
-    R = matrix_vector_multiplication(T, A)
-    R = decrypt_vector(R)
-    R = np.array(R[:16]).reshape(4,4, order='F')
-    print("Encrypted Result: ", np.rint(R))
-
-    """
-
-
